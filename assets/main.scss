@@ -1,0 +1,15 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+body {
+  --60: #e7e7e7;
+  --20: #ff7c7c;
+  --10: #c52233;
+  background-color: var(--60);
+  font-family: K2D;
+  letter-spacing: 0.025rem;
+}
