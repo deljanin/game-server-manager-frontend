@@ -1,24 +1,30 @@
 <script setup></script>
 <template>
-  <div>
-    <div class="navbar">
-      <ul>
-        <NuxtLink to="/"><li>Dashboard</li></NuxtLink>
-        <NuxtLink to="/login"><li>Login</li></NuxtLink>
-        <NuxtLink to="/create"><li>Create server</li></NuxtLink>
-      </ul>
-    </div>
-    <slot />
+  <div class="navbar">
+    <ul>
+      <NuxtLink to="/"><li>Dashboard</li></NuxtLink>
+      <NuxtLink to="/login"><li>Login</li></NuxtLink>
+      <NuxtLink to="/create"><li>Create server</li></NuxtLink>
+    </ul>
   </div>
+  <slot />
 </template>
 <style lang="scss">
 .navbar {
-  padding: 1rem;
-  box-shadow: 0 0 30px rgba($color: #000000, $alpha: 0.5);
+  position: fixed;
+  top: 0;
+  width: 100%;
+  height: 70px;
+  display: flex;
+  z-index: 5;
+  background-color: var(--30);
+  box-shadow: var(--shadow);
   ul {
+    width: 100%;
+    padding: 0 1rem;
     display: flex;
     align-items: center;
-    justify-items: start;
+    justify-content: start;
     gap: 1rem;
     li {
       list-style: none;
@@ -32,6 +38,12 @@
 
       &:hover {
         scale: 1.05;
+      }
+    }
+    @media (max-width: 768px) {
+      justify-content: space-between;
+      li {
+        font-size: 0.8rem;
       }
     }
   }
