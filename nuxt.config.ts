@@ -3,7 +3,7 @@ export default defineNuxtConfig({
   compatibilityDate: '2024-11-01',
   devtools: { enabled: true },
   css: ['~/assets/main.scss'],
-  modules: ['@nuxt/fonts'],
+  modules: ['@nuxt/fonts', '@pinia/nuxt'],
   fonts: {
     families: [
       {
@@ -12,4 +12,5 @@ export default defineNuxtConfig({
       },
     ],
   },
+  plugins: ['~/plugins/initStore.js'],
 });

@@ -15,3 +15,15 @@
   font-family: K2D;
   letter-spacing: 0.05rem;
 }
+
+button,
+input[type='submit'],
+input[type='reset'] {
+  background: none;
+  color: inherit;
+  border: none;
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
+  outline: inherit;
+}

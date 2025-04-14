@@ -1,55 +1,80 @@
 <script setup>
-import { ref } from 'vue';
-const servers = [
-  { id: 1, name: 'Minecraft', status: 'running' },
-  { id: 2, name: 'ARK', status: 'not running' },
-  { id: 3, name: 'BLR', status: 'running' },
-  { id: 4, name: 'CS:GO', status: 'running' },
-  { id: 5, name: 'Rust', status: 'not running' },
-];
+import { ref, onMounted } from 'vue';
+import { withAuth } from '@/utils/withAuth.js';
+
+const servers = ref([]);
+const loading = ref(true);
+
+async function fetchServers(accessToken) {
+  const response = await fetch('http://localhost:8000/api/game-server/', {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`${response.status}: ${text}`);
+  }
+
+  return await response.json();
+}
+
+onMounted(async () => {
+  try {
+    const data = await withAuth(fetchServers);
+    servers.value = data;
+  } catch (error) {
+    console.error('Error fetching servers:', error);
+  } finally {
+    loading.value = false;
+  }
+  for (let index = 0; index < servers.value.length; index++) {
+    const element = servers.value[index];
+    console.log(element);
+  }
+});
 
 const showModal = ref(false);
 const selectedServer = ref(null);
 
-function confirmStop(server) {
-  selectedServer.value = server;
-  showModal.value = true;
-}
+// function confirmStop(server) {
+//   selectedServer.value = server;
+//   showModal.value = true;
+// }
 
-function stopServer() {
-  if (selectedServer.value) {
-    selectedServer.value.status = 'not running';
-    showModal.value = false;
-  }
-}
+// function stopGameServer() {
+//   if (selectedServer.value) {
+//     selectedServer.value.status = 'not running';
+//     showModal.value = false;
+//   }
+// }
+// function startGameServer(){
+
+// }
 </script>
 
 <template>
   <div class="container">
     <h1>Dashboard</h1>
-    <div class="servers">
+    <div v-if="loading">Loading servers...</div>
+    <div v-else-if="error">{{ error }}</div>
+    <span v-if="servers.length === 0">
+      There are no servers.
+      <NuxtLink to="/create"><u>Create one?</u></NuxtLink>
+    </span>
+    <div v-else class="servers">
       <div v-for="(server, index) in servers" :key="index" class="server">
-        <h2>{{ server.name }}</h2>
-
-        <span
-          :class="
-            server.status === 'running' ? 'status-online' : 'status-offline'
-          ">
-          {{ server.status }}
+        <h2>{{ server.server_name }}</h2>
+        <span :class="server.is_running ? 'status-online' : 'status-offline'">
+          {{ server.is_running ? 'running' : 'not running' }}
         </span>
 
-        <div class="">
-          <Button
-            @click="
-              server.status === 'running'
-                ? confirmStop(server)
-                : (server.status = 'running')
-            ">
-            {{ server.status === 'running' ? 'Stop' : 'Start' }}
-          </Button>
-        </div>
+        <Button>
+          {{ server.is_running ? 'Stop' : 'Start' }}
+        </Button>
         <NuxtLink :to="`/${server.id}`">
-          <Button>Logs</Button>
+          <Button>Info</Button>
         </NuxtLink>
       </div>
     </div>
@@ -60,7 +85,7 @@ function stopServer() {
         <h3>Confirm Stop</h3>
         <p>Are you sure you want to stop {{ selectedServer?.name }} server?</p>
         <div class="modal-actions">
-          <Button @click="stopServer">Yes, Stop</Button>
+          <Button @click="stopGameServer">Yes, Stop</Button>
           <Button @click="showModal = false">Cancel</Button>
         </div>
       </div>

@@ -1,10 +1,19 @@
-<script setup></script>
+<script setup>
+import { useAuthStore } from '~/store/auth';
+
+const auth = useAuthStore();
+
+function logout() {
+  auth.clearTokens();
+  return navigateTo('/login');
+}
+</script>
 <template>
   <div class="navbar">
     <ul>
       <NuxtLink to="/"><li>Dashboard</li></NuxtLink>
-      <NuxtLink to="/login"><li>Login</li></NuxtLink>
-      <NuxtLink to="/create"><li>Create server</li></NuxtLink>
+      <NuxtLink to="/create"><li>Create Server</li></NuxtLink>
+      <li @click="logout">Logout</li>
     </ul>
   </div>
   <slot />
@@ -35,7 +44,7 @@
       transition: all 400ms cubic-bezier(0.075, 0.82, 0.165, 1);
       color: var(--60);
       text-decoration: none;
-
+      cursor: pointer;
       &:hover {
         scale: 1.05;
       }

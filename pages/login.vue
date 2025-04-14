@@ -1,11 +1,50 @@
 <script setup>
+definePageMeta({
+  layout: 'empty',
+});
 import { ref } from 'vue';
+import { useAuthStore } from '~/store/auth';
+import { useRouter } from 'vue-router';
 
 const username = ref('');
 const password = ref('');
+const errorMessage = ref('');
+const router = useRouter();
 
-function loginUser() {
-  alert(`User data:\nUsername: ${username.value}\nPassword: ${password.value}`);
+const authStore = useAuthStore();
+
+async function loginUser() {
+  const requestBody = {
+    username: username.value,
+    password: password.value,
+  };
+
+  try {
+    const response = await fetch('http://localhost:8000/api/user/login/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestBody),
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      const accessToken = data.access;
+      const refreshToken = data.refresh;
+
+      // Store tokens in Pinia store and localStorage
+      authStore.storeTokens(accessToken, refreshToken);
+
+      router.push('/');
+    } else {
+      const errorData = await response.json();
+      errorMessage.value = errorData.detail || 'An error occurred during login';
+    }
+  } catch (error) {
+    console.error('Error during login:', error);
+    errorMessage.value = 'Network error, please try again later.';
+  }
 }
 </script>
 
@@ -20,10 +59,14 @@ function loginUser() {
         </div>
         <div>
           <label for="password">Password</label>
-          <input v-model="password" type="password" placeholder="#12313" />
+          <input v-model="password" type="password" placeholder="******" />
         </div>
-        <Button>Submit</Button>
+        <Button type="submit">Submit</Button>
       </form>
+
+      <div v-if="errorMessage" class="error-message">
+        <p>{{ errorMessage }}</p>
+      </div>
     </div>
   </div>
 </template>
@@ -69,6 +112,12 @@ function loginUser() {
         margin-top: 0.7rem;
       }
     }
+
+    .error-message {
+      margin-top: 1rem;
+      color: red;
+    }
+
     @media screen and (width >= 640px) {
       padding: 7rem;
     }
