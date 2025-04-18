@@ -11,6 +11,7 @@ const run_command = ref('');
 const dropzoneRef = ref(null);
 const errorMessage = ref('');
 const router = useRouter();
+const config = useRuntimeConfig();
 
 async function createGameServer() {
   const formData = new FormData();
@@ -25,14 +26,16 @@ async function createGameServer() {
   try {
     loading.value = true;
     await withAuth(async (accessToken) => {
-      const response = await fetch('http://localhost:8000/api/game-server/', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          // ❗ DO NOT set Content-Type when using FormData
-        },
-        body: formData,
-      });
+      const response = await fetch(
+        `${config.public.apiBase}/api/game-server/`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: formData,
+        }
+      );
 
       if (!response.ok) {
         const errorData = await response.json();
@@ -71,11 +74,10 @@ async function createGameServer() {
             placeholder="java -Xmx1024M -Xms1024M -jar server.jar nogui" />
         </div>
 
-        <!-- 👇 bind the DropZone ref -->
         <DropZone ref="dropzoneRef" />
 
         <Button type="submit" :disabled="loading">Submit</Button>
-        <span v-if="loading">Uploading...</span>
+        <div v-if="loading" class="loader"></div>
       </form>
     </div>
   </div>
@@ -123,6 +125,39 @@ async function createGameServer() {
     @media screen and (width >= 640px) {
       padding: 7rem;
     }
+  }
+}
+
+.loader {
+  display: block;
+  width: 130px;
+  height: 3px;
+  border-radius: 30px;
+  background-color: rgba(0, 0, 0, 0.2);
+  position: relative;
+}
+
+.loader::before {
+  content: '';
+  position: absolute;
+  background: var(--10);
+  top: 0;
+  left: 0;
+  width: 0%;
+  height: 100%;
+  border-radius: 30px;
+  animation: moving 1s ease-in-out infinite;
+}
+
+@keyframes moving {
+  50% {
+    width: 100%;
+  }
+
+  100% {
+    width: 0;
+    right: 0;
+    left: unset;
   }
 }
 </style>

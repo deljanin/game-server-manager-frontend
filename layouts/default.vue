@@ -33,7 +33,7 @@ function logout() {
     padding: 0 1rem;
     display: flex;
     align-items: center;
-    justify-content: start;
+    justify-content: center;
     gap: 1rem;
     li {
       list-style: none;
@@ -44,6 +44,7 @@ function logout() {
       transition: all 400ms cubic-bezier(0.075, 0.82, 0.165, 1);
       color: var(--60);
       text-decoration: none;
+      text-align: center;
       cursor: pointer;
       &:hover {
         scale: 1.05;

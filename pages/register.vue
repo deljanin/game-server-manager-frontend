@@ -14,14 +14,14 @@ const router = useRouter();
 const authStore = useAuthStore();
 const config = useRuntimeConfig();
 
-async function loginUser() {
+async function registerUser() {
   const requestBody = {
     username: username.value,
     password: password.value,
   };
 
   try {
-    const response = await fetch(`${config.public.apiBase}/api/user/login/`, {
+    const response = await fetch(`${config.public.apiBase}/api/register/`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -30,14 +30,7 @@ async function loginUser() {
     });
 
     if (response.ok) {
-      const data = await response.json();
-      const accessToken = data.access;
-      const refreshToken = data.refresh;
-
-      // Store tokens in Pinia store and localStorage
-      authStore.storeTokens(accessToken, refreshToken);
-      // console.log(accessToken);
-      router.push('/');
+      router.push('/login');
     } else {
       const errorData = await response.json();
       errorMessage.value = errorData.detail || 'An error occurred during login';
@@ -52,8 +45,8 @@ async function loginUser() {
 <template>
   <div class="container">
     <div>
-      <h1>Login</h1>
-      <form @submit.prevent="loginUser">
+      <h1>Register</h1>
+      <form @submit.prevent="registerUser">
         <div>
           <label for="username">Username</label>
           <input v-model="username" type="text" placeholder="username" />
@@ -62,6 +55,10 @@ async function loginUser() {
           <label for="password">Password</label>
           <input v-model="password" type="password" placeholder="******" />
         </div>
+        <span
+          >After creating user, set USER_REGISTRATION_ENABLED to false <br />
+          and restart backend server!</span
+        >
         <Button type="submit">Submit</Button>
       </form>
 
@@ -108,6 +105,11 @@ async function loginUser() {
           border-radius: 5px;
           background-color: var(--30);
         }
+      }
+      span {
+        font-size: 0.85rem;
+        color: var(--10);
+        text-align: center;
       }
       button {
         margin-top: 0.7rem;

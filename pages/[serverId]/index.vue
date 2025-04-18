@@ -1,105 +1,275 @@
 <script setup>
-import { ref, watch } from 'vue';
+import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue';
+import { useRoute } from 'vue-router';
+import { withAuth } from '@/utils/withAuth.js';
+import { useRouter } from 'vue-router';
+import { useAuthStore } from '~/store/auth';
 
-const mockData = {
-  name: 'Minecraft',
-  status: 'running',
-  logs: `
-[09:21:03] [Server thread/INFO]: Starting Minecraft server version 1.20.1
-[09:21:04] [Server thread/INFO]: Loading properties
-[09:21:05] [Server thread/INFO]: Default game type: SURVIVAL
-[09:21:06] [Server thread/INFO]: Generating keypair
-[09:21:07] [Server thread/INFO]: Starting Minecraft server on *:25565
-[09:21:08] [Server thread/INFO]: Preparing level "world"
-[09:21:09] [Server thread/INFO]: Preparing start region for dimension minecraft:overworld
-[09:21:12] [Server thread/INFO]: Done (8.123s)! For help, type "help"
-[09:21:14] [User Authenticator #1/INFO]: UUID of player Steve is 123e4567-e89b-12d3-a456-426614174000
-[09:21:15] [Server thread/INFO]: Steve[/192.168.0.42:57832] logged in with entity id 123 at (100.5, 64.0, -50.5)
-[09:21:16] [Server thread/INFO]: Steve joined the game
-[09:22:00] [Server thread/INFO]: Steve issued server command: /give Steve diamond_sword
-[09:22:10] [Server thread/INFO]: Steve left the game
-[09:21:03] [Server thread/INFO]: Starting Minecraft server version 1.20.1
-[09:21:04] [Server thread/INFO]: Loading properties
-[09:21:05] [Server thread/INFO]: Default game type: SURVIVAL
-[09:21:06] [Server thread/INFO]: Generating keypair
-[09:21:07] [Server thread/INFO]: Starting Minecraft server on *:25565
-[09:21:08] [Server thread/INFO]: Preparing level "world"
-[09:21:09] [Server thread/INFO]: Preparing start region for dimension minecraft:overworld
-[09:21:12] [Server thread/INFO]: Done (8.123s)! For help, type "help"
-[09:21:14] [User Authenticator #1/INFO]: UUID of player Steve is 123e4567-e89b-12d3-a456-426614174000
-[09:21:15] [Server thread/INFO]: Steve[/192.168.0.42:57832] logged in with entity id 123 at (100.5, 64.0, -50.5)
-[09:21:16] [Server thread/INFO]: Steve joined the game
-[09:22:00] [Server thread/INFO]: Steve issued server command: /give Steve diamond_sword
-[09:22:10] [Server thread/INFO]: Steve left the game
-[09:21:03] [Server thread/INFO]: Starting Minecraft server version 1.20.1
-[09:21:04] [Server thread/INFO]: Loading properties
-[09:21:05] [Server thread/INFO]: Default game type: SURVIVAL
-[09:21:06] [Server thread/INFO]: Generating keypair
-[09:21:07] [Server thread/INFO]: Starting Minecraft server on *:25565
-[09:21:08] [Server thread/INFO]: Preparing level "world"
-[09:21:09] [Server thread/INFO]: Preparing start region for dimension minecraft:overworld
-[09:21:12] [Server thread/INFO]: Done (8.123s)! For help, type "help"
-[09:21:14] [User Authenticator #1/INFO]: UUID of player Steve is 123e4567-e89b-12d3-a456-426614174000
-[09:21:15] [Server thread/INFO]: Steve[/192.168.0.42:57832] logged in with entity id 123 at (100.5, 64.0, -50.5)
-[09:21:16] [Server thread/INFO]: Steve joined the game
-[09:22:00] [Server thread/INFO]: Steve issued server command: /give Steve diamond_sword
-[09:22:10] [Server thread/INFO]: Steve left the game
-  `, // Get this via websockets later
-};
-
+const config = useRuntimeConfig();
+const route = useRoute();
+const server = ref(null);
+const loading = ref(true);
 const logRef = ref(null);
+const logs = ref('');
 const autoScrollEnabled = ref(true);
+const showModal = ref(false);
+const modalTitle = ref('');
+const modalMessage = ref('');
+const modalConfirmAction = ref(() => {});
+const router = useRouter();
+let socket = null;
 
-// Detect when logs change
-watch(
-  () => mockData.logs,
-  () => {
-    if (autoScrollEnabled.value && logRef.value) {
+const serverId = route.params.serverId;
+
+watch(logs, () => {
+  if (autoScrollEnabled.value && logRef.value) {
+    nextTick(() => {
       logRef.value.scrollTop = logRef.value.scrollHeight;
-    }
+    });
   }
-);
+});
 
-// Watch for user scroll (disable auto-scroll if user scrolls up)
-const handleScroll = () => {
-  if (!logRef.value) return;
-  const isAtBottom =
-    logRef.value.scrollHeight - logRef.value.scrollTop <=
-    logRef.value.clientHeight + 10;
-  autoScrollEnabled.value = isAtBottom;
-};
-
-// Optional: button to resume auto-scroll manually
-const enableAutoScroll = () => {
-  autoScrollEnabled.value = true;
+onMounted(() => {
   if (logRef.value) {
-    logRef.value.scrollTop = logRef.value.scrollHeight;
+    logRef.value.addEventListener('scroll', handleScroll);
   }
+});
+
+onUnmounted(() => {
+  if (logRef.value) {
+    logRef.value.removeEventListener('scroll', handleScroll);
+  }
+});
+
+const handleScroll = () => {
+  const el = logRef.value;
+  if (!el) return;
+  const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 10;
+  autoScrollEnabled.value = nearBottom;
 };
+
+async function fetchServer(accessToken) {
+  const response = await fetch(
+    `${config.public.apiBase}/api/game-server/${serverId}/`,
+    {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    }
+  );
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`${response.status}: ${text}`);
+  }
+
+  return await response.json();
+}
+
+onMounted(async () => {
+  try {
+    const data = await withAuth(fetchServer);
+    server.value = data;
+    if (server.value?.is_running) {
+      connectWebSocket();
+    }
+  } catch (error) {
+    console.error('Error fetching server:', error);
+  } finally {
+    loading.value = false;
+  }
+});
+
+function openModal({ title, message, onConfirm, server }) {
+  modalTitle.value = title;
+  modalMessage.value = message;
+  modalConfirmAction.value = () => {
+    onConfirm(server);
+    showModal.value = false;
+  };
+  showModal.value = true;
+}
+
+function confirmDelete(server) {
+  openModal({
+    title: 'Confirm Delete',
+    message: `Are you sure you want to delete "${server.server_name}"? This cannot be undone.`,
+    onConfirm: deleteGameServer,
+    server,
+  });
+}
+
+async function deleteGameServer(server) {
+  try {
+    const response = await withAuth(async (accessToken) => {
+      const deleteResponse = await fetch(
+        `${config.public.apiBase}/api/game-server/${serverId}/`,
+        {
+          method: 'DELETE',
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        }
+      );
+
+      if (!deleteResponse.ok) {
+        const errorText = await deleteResponse.text();
+        throw new Error(
+          `Error deleting server: ${deleteResponse.status} - ${errorText}`
+        );
+      }
+
+      router.push('/');
+    });
+  } catch (error) {
+    console.error('Error deleting server:', error);
+    alert('There was an error deleting the server. Please try again.');
+  }
+}
+
+function confirmStop(server) {
+  openModal({
+    title: 'Confirm Stop',
+    message: `Are you sure you want to stop "${server.server_name}"?`,
+    onConfirm: stopGameServer,
+    server,
+  });
+}
+
+async function stopGameServer(server) {
+  try {
+    const response = await withAuth(async (accessToken) => {
+      const stopResponse = await fetch(
+        `${config.public.apiBase}/api/game-server/${serverId}/stop/`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        }
+      );
+
+      if (!stopResponse.ok) {
+        const errorText = await stopResponse.text();
+        throw new Error(
+          `Error starting server: ${stopResponse.status} - ${errorText}`
+        );
+      }
+
+      server.is_running = false;
+    });
+  } catch (error) {
+    console.error('Error stopping server:', error);
+  }
+}
+
+async function startGameServer(server) {
+  try {
+    const response = await withAuth(async (accessToken) => {
+      const startResponse = await fetch(
+        `${config.public.apiBase}/api/game-server/${serverId}/start/`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        }
+      );
+
+      if (!startResponse.ok) {
+        const errorText = await startResponse.text();
+        throw new Error(
+          `Error starting server: ${startResponse.status} - ${errorText}`
+        );
+      }
+
+      server.is_running = true;
+      connectWebSocket();
+    });
+  } catch (error) {
+    console.error('Error starting server:', error);
+  }
+}
+
+function connectWebSocket() {
+  const authStore = useAuthStore();
+
+  if (socket) {
+    socket.close(); // Close existing socket if any
+  }
+
+  socket = new WebSocket(
+    `${config.public.wsBase}/ws/server/${serverId}/?token=${authStore.accessToken}`
+  );
+  socket.onopen = () => {
+    logs.value = 'WebSocket connected!\n';
+  };
+
+  socket.onmessage = (event) => {
+    const data = JSON.parse(event.data);
+    logs.value += data['log'];
+  };
+
+  socket.onclose = () => {
+    logs.value += 'WebSocket closed!\n';
+  };
+
+  socket.onerror = (error) => {
+    console.error('WebSocket error:', error);
+  };
+}
+
+onUnmounted(() => {
+  if (socket && socket.readyState === WebSocket.OPEN) {
+    socket.close();
+  }
+});
 </script>
-<!-- id {{ $route.params.serverId }} -->
+
 <template>
   <div class="container">
-    <div>
-      <h1>{{ mockData.name }}</h1>
+    <div v-if="loading">Loading...</div>
+    <div v-else>
+      <h1>{{ server.server_name }}</h1>
       <div class="server-info">
         <div>
-          <span>Logs:</span>
           <div>
-            <Button>{{
-              mockData.status === 'running' ? 'Stop' : 'Start'
-            }}</Button
-            ><Button v-if="!autoScrollEnabled" @click="enableAutoScroll">
-              Resume Auto-Scroll
+            <Button
+              @click="
+                server.is_running
+                  ? confirmStop(server)
+                  : startGameServer(server)
+              "
+              >{{ server.is_running ? 'Stop' : 'Start' }}</Button
+            >
+            <Button
+              :disabled="autoScrollEnabled"
+              :class="{ 'disabled-button': autoScrollEnabled }"
+              @click="
+                autoScrollEnabled = !autoScrollEnabled;
+                nextTick(() => {
+                  logRef.value.scrollTop = logRef.value.scrollHeight;
+                });
+              ">
+              Auto-Scroll
             </Button>
+            <Button @click="confirmDelete(server)">Delete Server</Button>
           </div>
         </div>
-        <div class="server-stream">
-          <pre ref="logRef" @scroll="handleScroll">{{ mockData.logs }}</pre>
+        <div class="logs">
+          <pre ref="logRef" @scroll="handleScroll">{{
+            logs || 'No logs available.'
+          }}</pre>
         </div>
       </div>
     </div>
   </div>
+  <ConfirmModal
+    :show="showModal"
+    :title="modalTitle"
+    :message="modalMessage"
+    @confirm="modalConfirmAction"
+    @cancel="() => (showModal = false)" />
 </template>
 
 <style lang="scss" scoped>
@@ -121,20 +291,19 @@ const enableAutoScroll = () => {
     gap: 1rem;
   }
   .server-info {
-    max-width: 70%;
     > div {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      span {
-        font-size: 1.3rem;
-      }
       > div {
         display: flex;
         gap: 1rem;
       }
     }
-    .server-stream {
+    .logs {
+      width: 100%;
+      max-width: 800px;
+      min-width: 500px;
       margin-top: 1rem;
 
       padding: 1rem 0.5rem;
@@ -148,8 +317,22 @@ const enableAutoScroll = () => {
         font-family: monospace;
         font-size: 1rem;
         white-space: pre-wrap;
+        overflow-x: auto;
+        word-break: break-all;
+      }
+      @media screen and (max-width: 768px) {
+        width: 100%;
+        max-width: 100%;
+        min-width: 100%;
       }
     }
+  }
+}
+.disabled-button {
+  opacity: 0.5;
+  cursor: not-allowed;
+  &:hover {
+    scale: 1;
   }
 }
 </style>

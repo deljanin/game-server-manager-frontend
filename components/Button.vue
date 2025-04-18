@@ -26,5 +26,8 @@ button {
   &:hover {
     scale: 1.1;
   }
+  @media (max-width: 768px) {
+    font-size: 0.8rem;
+  }
 }
 </style>

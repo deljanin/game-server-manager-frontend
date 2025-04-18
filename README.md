@@ -1,8 +1,28 @@
-# Nuxt Minimal Starter
+# Nuxt Game Server Manager UI
 
-Look at the [Nuxt documentation](https://nuxt.com/docs/getting-started/introduction) to learn more.
+This project is a Nuxt 3 frontend that connects to a Django backend. You’ll need to configure environment variables before running the app.
+
+---
 
 ## Setup
+
+Clone the repository:
+
+```bash
+git clone https://github.com/deljanin/game-server-manager-frontend.git
+cd game-server-manager-frontend
+```
+
+## Environment Setup
+
+Create a `.env` file in the root of the project with the following contents. <br> (Or your publicly available domain pointing to the backend python server):
+
+```env
+API_BASE_URL=http://localhost:8000
+WS_BASE_URL=ws://localhost:8000
+```
+
+## Instructions
 
 Make sure to install dependencies:
 
@@ -72,4 +92,24 @@ yarn preview
 bun run preview
 ```
 
-Check out the [deployment documentation](https://nuxt.com/docs/getting-started/deployment) for more information.
+## Run webserver
+
+To run the server use this command:
+
+```bash
+node .output/server/index.mjs
+```
+
+Or use pm2 to manage as a service.
+
+Once live go to (on local machine):
+
+```
+http://localhost:3000/register
+```
+
+or on your domain pointing to your machine:
+
+```
+https://yourdomain.com/register
+```

@@ -1,12 +1,21 @@
 <script setup>
+import ConfirmModal from '@/components/ConfirmModal.vue';
 import { ref, onMounted } from 'vue';
 import { withAuth } from '@/utils/withAuth.js';
+import { useRouter } from 'vue-router';
 
+const router = useRouter();
 const servers = ref([]);
 const loading = ref(true);
+const showModal = ref(false);
+const modalTitle = ref('');
+const modalMessage = ref('');
+const modalConfirmAction = ref(() => {});
+const selectedServer = ref(null);
+const config = useRuntimeConfig();
 
 async function fetchServers(accessToken) {
-  const response = await fetch('http://localhost:8000/api/game-server/', {
+  const response = await fetch(`${config.public.apiBase}/api/game-server/`, {
     headers: {
       Authorization: `Bearer ${accessToken}`,
     },
@@ -29,36 +38,87 @@ onMounted(async () => {
   } finally {
     loading.value = false;
   }
-  for (let index = 0; index < servers.value.length; index++) {
-    const element = servers.value[index];
-    console.log(element);
-  }
 });
 
-const showModal = ref(false);
-const selectedServer = ref(null);
+function openModal({ title, message, onConfirm, server }) {
+  modalTitle.value = title;
+  modalMessage.value = message;
+  modalConfirmAction.value = () => {
+    onConfirm(server);
+    showModal.value = false;
+  };
+  selectedServer.value = server;
+  showModal.value = true;
+}
 
-// function confirmStop(server) {
-//   selectedServer.value = server;
-//   showModal.value = true;
-// }
+function confirmStop(server) {
+  openModal({
+    title: 'Confirm Stop',
+    message: `Are you sure you want to stop "${server.server_name}"?`,
+    onConfirm: stopGameServer,
+    server,
+  });
+}
 
-// function stopGameServer() {
-//   if (selectedServer.value) {
-//     selectedServer.value.status = 'not running';
-//     showModal.value = false;
-//   }
-// }
-// function startGameServer(){
+async function startGameServer(server) {
+  try {
+    const response = await withAuth(async (accessToken) => {
+      const startResponse = await fetch(
+        `${config.public.apiBase}/api/game-server/${server.id}/start/`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        }
+      );
 
-// }
+      if (!startResponse.ok) {
+        const errorText = await startResponse.text();
+        throw new Error(
+          `Error starting server: ${startResponse.status} - ${errorText}`
+        );
+      }
+
+      server.is_running = true;
+      router.push(`/${server.id}`); // Redirect to the server page
+    });
+  } catch (error) {
+    console.error('Error starting server:', error);
+  }
+}
+async function stopGameServer(server) {
+  try {
+    const response = await withAuth(async (accessToken) => {
+      const stopResponse = await fetch(
+        `${config.public.apiBase}/api/game-server/${server.id}/stop/`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        }
+      );
+
+      if (!stopResponse.ok) {
+        const errorText = await stopResponse.text();
+        throw new Error(
+          `Error starting server: ${stopResponse.status} - ${errorText}`
+        );
+      }
+
+      server.is_running = false;
+    });
+  } catch (error) {
+    console.error('Error stopping server:', error);
+  }
+}
 </script>
 
 <template>
   <div class="container">
     <h1>Dashboard</h1>
     <div v-if="loading">Loading servers...</div>
-    <div v-else-if="error">{{ error }}</div>
     <span v-if="servers.length === 0">
       There are no servers.
       <NuxtLink to="/create"><u>Create one?</u></NuxtLink>
@@ -66,31 +126,33 @@ const selectedServer = ref(null);
     <div v-else class="servers">
       <div v-for="(server, index) in servers" :key="index" class="server">
         <h2>{{ server.server_name }}</h2>
-        <span :class="server.is_running ? 'status-online' : 'status-offline'">
-          {{ server.is_running ? 'running' : 'not running' }}
-        </span>
-
-        <Button>
-          {{ server.is_running ? 'Stop' : 'Start' }}
-        </Button>
-        <NuxtLink :to="`/${server.id}`">
-          <Button>Info</Button>
-        </NuxtLink>
-      </div>
-    </div>
-  </div>
-  <Teleport to="body">
-    <div v-if="showModal" class="modal-overlay">
-      <div class="modal">
-        <h3>Confirm Stop</h3>
-        <p>Are you sure you want to stop {{ selectedServer?.name }} server?</p>
-        <div class="modal-actions">
-          <Button @click="stopGameServer">Yes, Stop</Button>
-          <Button @click="showModal = false">Cancel</Button>
+        <div>
+          <span :class="server.is_running ? 'status-online' : 'status-offline'">
+            {{ server.is_running ? 'running' : 'not running' }}
+          </span>
+          <div>
+            <Button
+              @click="
+                server.is_running
+                  ? confirmStop(server)
+                  : startGameServer(server)
+              ">
+              {{ server.is_running ? 'Stop' : 'Start' }}
+            </Button>
+          </div>
+          <NuxtLink :to="`/${server.id}`">
+            <Button>Info</Button>
+          </NuxtLink>
         </div>
       </div>
     </div>
-  </Teleport>
+  </div>
+  <ConfirmModal
+    :show="showModal"
+    :title="modalTitle"
+    :message="modalMessage"
+    @confirm="modalConfirmAction"
+    @cancel="() => (showModal = false)" />
 </template>
 
 <style lang="scss" scoped>
@@ -110,13 +172,14 @@ const selectedServer = ref(null);
   flex-direction: column;
   gap: 1rem;
   width: 100%;
-  max-width: 600px;
+  max-width: 1000px;
   padding: 0 1rem;
 }
 
 .server {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   background-color: var(--30);
   padding: 1rem;
   border-radius: 10px;
@@ -126,14 +189,11 @@ const selectedServer = ref(null);
     display: flex;
     align-items: center;
   }
-  div,
-  a {
-    text-decoration: none;
-    width: 100%;
-    height: 100%;
+  > div {
     display: flex;
     justify-content: center;
     align-items: center;
+    gap: 1rem;
   }
   /* Mobile responsive: 1 column layout on smaller screens */
   @media (max-width: 768px) {
@@ -152,34 +212,5 @@ const selectedServer = ref(null);
 .status-offline {
   color: red;
   font-weight: bold;
-}
-
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-color: rgba(0, 0, 0, 0.4);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 999;
-}
-
-.modal {
-  background-color: white;
-  padding: 2rem;
-  border-radius: 10px;
-  width: 90%;
-  max-width: 400px;
-  text-align: center;
-}
-
-.modal-actions {
-  margin-top: 1rem;
-  display: flex;
-  justify-content: space-around;
-  gap: 1rem;
 }
 </style>
