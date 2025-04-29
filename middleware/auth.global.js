@@ -1,10 +1,10 @@
+// middleware/auth.global.ts
 import { useAuthStore } from '~/store/auth';
+
 export default defineNuxtRouteMiddleware((to) => {
-  if (process.server) return;
-
   const auth = useAuthStore();
+  auth.initializeTokens();
 
-  // Only allow access to /login if not authenticated
   if (
     !auth.isAuthenticated &&
     to.path !== '/login' &&
@@ -13,7 +13,6 @@ export default defineNuxtRouteMiddleware((to) => {
     return navigateTo('/login');
   }
 
-  // If user is already logged in and tries to go to login again, redirect to dashboard
   if (auth.isAuthenticated && to.path === '/login') {
     return navigateTo('/');
   }

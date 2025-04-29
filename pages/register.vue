@@ -1,6 +1,6 @@
 <script setup>
 definePageMeta({
-  layout: 'empty',
+  layout: false,
 });
 import { ref } from 'vue';
 import { useAuthStore } from '~/store/auth';

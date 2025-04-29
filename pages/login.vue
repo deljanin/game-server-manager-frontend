@@ -1,6 +1,6 @@
 <script setup>
 definePageMeta({
-  layout: 'empty',
+  layout: false,
 });
 import { ref } from 'vue';
 import { useAuthStore } from '~/store/auth';
@@ -19,7 +19,7 @@ async function loginUser() {
     username: username.value,
     password: password.value,
   };
-
+  console.log(`${config.public.apiBase}/api/user/login/`);
   try {
     const response = await fetch(`${config.public.apiBase}/api/user/login/`, {
       method: 'POST',

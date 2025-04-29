@@ -12,7 +12,7 @@ export default defineNuxtConfig({
       },
     ],
   },
-  plugins: ['~/plugins/initStore.js'],
+  plugins: ['~/plugins/init-auth.js'],
   runtimeConfig: {
     public: {
       apiBase: process.env.API_BASE_URL || 'https://localhost:8000',
